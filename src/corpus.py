@@ -6,7 +6,7 @@ mixed); `pubmed_files` of them are drawn at random and kept whole.
 Writes one `{"id", "contents"}` per line, the format FlashRAG's index_builder expects.
 Everything is set in a YAML config (see configs/corpus.yaml):
 
-    uv run python -m fictional_bench.corpus configs/corpus.yaml
+    uv run python src/corpus.py configs/corpus.yaml
 """
 
 import argparse

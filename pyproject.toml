@@ -12,9 +12,8 @@ dependencies = [
     "pyyaml>=6.0.3",
 ]
 
-[build-system]
-requires = ["uv_build>=0.12.7,<0.13.0"]
-build-backend = "uv_build"
+[tool.uv]
+package = false  # plain scripts in src/, no installable package for now
 
 [dependency-groups]
 dev = [
@@ -26,7 +25,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests"]
+src = ["src"]
 
 [tool.ruff.lint]
 select = [
@@ -41,6 +40,3 @@ select = [
 
 [tool.ruff.format]
 quote-style = "double"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
