@@ -17,3 +17,6 @@ htmlcov/
 # IDE
 .idea/
 .vscode/
+
+# Data (corpora, indexes)
+data/
