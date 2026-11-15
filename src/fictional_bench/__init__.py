@@ -1,2 +1,1 @@
-def hello() -> str:
-    return "Hello from fictional-bench!"
+"""fictional-bench: contamination-controlled medical multi-hop retrieval benchmark."""

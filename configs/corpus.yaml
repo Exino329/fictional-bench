@@ -1,0 +1,8 @@
+# MedRAG corpus: all the textbooks plus random PubMed files.
+# Run with: uv run python -m fictional_bench.corpus configs/corpus.yaml
+
+out: data/corpus/medrag.jsonl
+seed: 0
+
+# Number of PubMed files drawn at random
+pubmed_files: 25
