@@ -10,6 +10,9 @@ from pathlib import Path
 HETIONET_URL = "https://media.githubusercontent.com/media/hetio/hetionet/main/hetnet/json/hetionet-v1.0.json.bz2"
 HETIONET_PATH = Path("data/hetionet/hetionet-v1.0.json.bz2")
 
+# Keep CC0 part of Hetionet graph
+LICENSE = "CC0 1.0"
+
 # A node is identified by its type and its identifier, e.g. ("Compound", "DB00331").
 NodeId = tuple[str, str]
 
@@ -41,8 +44,6 @@ class Hetionet:
             urllib.request.urlretrieve(HETIONET_URL, path)
         with bz2.open(path, "rt", encoding="utf-8") as f:
             graph = json.load(f)
-        nodes = (Node(n["kind"], str(n["identifier"]), n["name"]) for n in graph["nodes"])
-        self.nodes: dict[NodeId, Node] = {node.id: node for node in nodes}
         self.edges: list[Edge] = [
             Edge(
                 source=(edge["source_id"][0], str(edge["source_id"][1])),
@@ -51,7 +52,12 @@ class Hetionet:
                 license=edge["data"].get("license"),
             )
             for edge in graph["edges"]
+            if edge["data"].get("license") == LICENSE
         ]
+        # Keep only the nodes that some CC0 edge connects.
+        connected = {e.source for e in self.edges} | {e.target for e in self.edges}
+        nodes = (Node(n["kind"], str(n["identifier"]), n["name"]) for n in graph["nodes"])
+        self.nodes: dict[NodeId, Node] = {node.id: node for node in nodes if node.id in connected}
 
     def summarize(self) -> None:
         """Print the number of nodes per type, and of edges per relation and license."""
