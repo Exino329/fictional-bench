@@ -15,6 +15,17 @@ NodeId = tuple[str, str]
 
 
 @dataclass(slots=True)
+class Node:
+    kind: str  # the node type, e.g. "Compound"
+    identifier: str  # e.g. "DB00331" (always a string, gene identifiers included)
+    name: str  # e.g. "Metformin"
+
+    @property
+    def id(self) -> NodeId:
+        return (self.kind, self.identifier)
+
+
+@dataclass(slots=True)
 class Edge:
     source: NodeId
     relation: str  # e.g. "treats"
@@ -30,9 +41,8 @@ class Hetionet:
             urllib.request.urlretrieve(HETIONET_URL, path)
         with bz2.open(path, "rt", encoding="utf-8") as f:
             graph = json.load(f)
-        self.names: dict[NodeId, str] = {
-            (node["kind"], str(node["identifier"])): node["name"] for node in graph["nodes"]
-        }
+        nodes = (Node(n["kind"], str(n["identifier"]), n["name"]) for n in graph["nodes"])
+        self.nodes: dict[NodeId, Node] = {node.id: node for node in nodes}
         self.edges: list[Edge] = [
             Edge(
                 source=(edge["source_id"][0], str(edge["source_id"][1])),
@@ -45,8 +55,8 @@ class Hetionet:
 
     def summarize(self) -> None:
         """Print the number of nodes per type, and of edges per relation and license."""
-        nodes = Counter(kind for kind, _ in self.names)
-        print(f"\n{len(self.names)} nodes")
+        nodes = Counter(kind for kind, _ in self.nodes)
+        print(f"\n{len(self.nodes)} nodes")
         for kind, n in nodes.most_common():
             print(f"  {n:>7}  {kind}")
 
