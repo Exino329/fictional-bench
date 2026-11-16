@@ -1,0 +1,4 @@
+# Benchmark generator.
+# Run with: uv run python src/generator.py configs/generator.yaml
+
+seed: 0
