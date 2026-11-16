@@ -1,0 +1,8 @@
+# Benchmark generator.
+# Run with: uv run python src/generator.py configs/generator.yaml
+
+seed: 0
+
+# Numbers of hops to generate, and how many chains for each (same count for all, so they compare).
+hops: [2, 3, 4]
+chains_per_hop: 100
