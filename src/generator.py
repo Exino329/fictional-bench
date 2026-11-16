@@ -13,6 +13,8 @@ from hetionet import Hetionet
 @dataclass
 class GeneratorConfig:
     seed: int
+    hops: list[int]
+    chains_per_hop: int
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "GeneratorConfig":
