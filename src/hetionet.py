@@ -10,8 +10,18 @@ from pathlib import Path
 HETIONET_URL = "https://media.githubusercontent.com/media/hetio/hetionet/main/hetnet/json/hetionet-v1.0.json.bz2"
 HETIONET_PATH = Path("data/hetionet/hetionet-v1.0.json.bz2")
 
-# Keep CC0 part of Hetionet graph
-LICENSE = "CC0 1.0"
+# Keep the edges whose licence allows changing and sharing them, non-commercial ones included.
+# Left out: edges with no licence (Gene-Gene, Compound/Anatomy up/downregulates Gene, part of
+# Anatomy expresses Gene and Disease associates Gene), which we may not share.
+LICENSES = {
+    "CC0 1.0",
+    "CC BY 3.0",
+    "CC BY 4.0",
+    "CC BY-SA 3.0",
+    "ODbL 1.0",
+    "CC BY-NC 4.0",
+    "CC BY-NC-SA 4.0",
+}
 
 # A node is identified by its type and its identifier, e.g. ("Compound", "DB00331").
 NodeId = tuple[str, str]
@@ -22,6 +32,7 @@ class Node:
     kind: str  # the node type, e.g. "Compound"
     identifier: str  # e.g. "DB00331" (always a string, gene identifiers included)
     name: str  # e.g. "Metformin"
+    description: str = ""  # genes only, e.g. "adenomatous polyposis coli" for APC
 
     @property
     def id(self) -> NodeId:
@@ -52,11 +63,14 @@ class Hetionet:
                 license=edge["data"].get("license"),
             )
             for edge in graph["edges"]
-            if edge["data"].get("license") == LICENSE
+            if edge["data"].get("license") in LICENSES
         ]
-        # Keep only the nodes that some CC0 edge connects.
+        # Keep only the nodes that some kept edge connects.
         connected = {e.source for e in self.edges} | {e.target for e in self.edges}
-        nodes = (Node(n["kind"], str(n["identifier"]), n["name"]) for n in graph["nodes"])
+        nodes = (
+            Node(n["kind"], str(n["identifier"]), n["name"], n["data"].get("description", ""))
+            for n in graph["nodes"]
+        )
         self.nodes: dict[NodeId, Node] = {node.id: node for node in nodes if node.id in connected}
 
     def summarize(self) -> None:
