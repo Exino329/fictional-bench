@@ -1,0 +1,44 @@
+# RAG experiments with FlashRAG. Run everything with the RAG environment (scripts/setup_rag_env.sh):
+#   .venv-rag/bin/python src/rag_data.py configs/rag.yaml          # corpus + questions
+#   bash scripts/build_rag_indexes.sh configs/rag.yaml             # BM25 and dense indexes
+#   .venv-rag/bin/python src/rag_run.py configs/rag.yaml           # every method below
+#   .venv-rag/bin/python src/rag_eval.py configs/rag.yaml          # answer accuracy and recall
+
+# Corpus: the chunks of these books (src/books.py split), one document per chunk.
+books: [1-pdq-colorectal-major-genetic-syndromes]
+chunks_dir: data/books/processed/chunks
+corpus: data/rag/corpus/pdq.jsonl
+index_dir: data/rag/indexes/pdq
+
+# Questions: each hop gives sentences of the text; the chunks that contain one are its gold docs.
+questions: configs/rag/smoke_questions.jsonl
+dataset_dir: data/rag/datasets/smoke  # FlashRAG dataset (test.jsonl), written by src/rag_data.py
+runs_dir: data/rag/runs/smoke
+
+methods: [closed_book, oracle, sequential, ircot]  # sequential and ircot run with each retriever
+retrievers:
+  bm25:
+    retrieval_method: bm25
+    bm25_backend: bm25s
+    index_path: data/rag/indexes/pdq/bm25
+  bge-m3:
+    retrieval_method: bge-m3
+    retrieval_model_path: BAAI/bge-m3
+    retrieval_pooling_method: cls
+    retrieval_query_max_length: 512
+    use_sentence_transformer: true
+    instruction: ""  # BGE-M3 takes no query prefix; FlashRAG adds the BGE v1.5 one by default
+    index_path: data/rag/indexes/pdq/bge-m3_Flat.index
+
+retrieval_topk: 5  # documents given to the reader
+recall_k: [1, 5, 10, 20]  # sequential keeps max(recall_k) documents to measure recall@k
+ircot_max_iter: 3
+
+# Reader: Apertus in FP8 (src/quantize_fp8.py), so it fits the 16 GB laptop GPU.
+generator:
+  framework: vllm
+  generator_model: apertus-8b-meditron
+  generator_model_path: data/models/Apertus-8B-MeditronFO-FP8-Dynamic
+  generator_max_input_len: 8192
+  gpu_memory_utilization: 0.8
+  generation_params: {max_tokens: 64, temperature: 0}

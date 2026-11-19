@@ -31,7 +31,9 @@ if ! "$ENV_DIR/bin/python" -c "import sys; sys.exit(sys.version_info[:2] != tupl
     uv venv --clear --managed-python --python "$PYTHON_VERSION" "$ENV_DIR"
 fi
 
+# sentence-transformers (dense indexes) for transformers 4 needs huggingface-hub<1;
+# termcolor is imported by FlashRAG's pipelines but not declared as a dependency.
 uv pip install --python "$ENV_DIR/bin/python" "vllm==$VLLM_VERSION" "$TRANSFORMERS_SPEC" "$FLASHRAG_SPEC" \
-    faiss-cpu pyyaml "huggingface-hub<1"  # sentence-transformers for transformers 4 needs huggingface-hub<1
+    faiss-cpu sentence-transformers termcolor pyyaml "huggingface-hub<1"
 
 "$ENV_DIR/bin/python" -c "import vllm, torch, flashrag; print('vllm', vllm.__version__, '| torch', torch.__version__, '| cuda', torch.cuda.is_available())"
