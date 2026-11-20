@@ -3,7 +3,7 @@
 The book text is the reference text written by `src/books.py pages` (its cleaned pages joined
 by a blank line): the closest we have to the PDF, and free of the table headers that mmore
 repeats in each table-row chunk. Positions are character offsets in that text. The chunk
-count comes from the per-book chunk files (`src/books.py split`). Writes one JSON per book:
+count comes from the per-document chunk files (`src/books.py chunk`). Writes one JSON per book:
 
     {"book", "pages": N, "chunks": N, "chars": length of the book text,
      "entities": {"<kind>": [{"identifier", "name", "mentions",
@@ -18,7 +18,7 @@ symbols (so the gene "CAT" does not match "cat"). A gene symbol is dropped when 
 defines it as the abbreviation of something else ("familial adenomatous polyposis (FAP)").
 Only the nodes kept by the licence filter of src/hetionet.py are searched.
 
-    uv run python src/book_entities.py configs/books.yaml
+    uv run python src/book_entities.py configs/textbooks.yaml
 """
 
 import argparse
@@ -26,10 +26,8 @@ import bisect
 import json
 import re
 from collections import defaultdict
-from pathlib import Path
 
-import yaml
-
+from books import CorpusConfig
 from hetionet import Hetionet, NodeId
 
 MAX_WORDS = 8  # longest entity name we look for, in words
@@ -150,19 +148,18 @@ def book_entities(book: dict, chunks: list[str], graph: Hetionet, names: dict, g
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("config", help="YAML config, e.g. configs/books.yaml")
-    config = yaml.safe_load(Path(parser.parse_args().config).read_text(encoding="utf-8"))
-    out_dir = Path(config["entities_dir"])
+    parser.add_argument("config", help="corpus config, e.g. configs/textbooks.yaml")
+    config = CorpusConfig.from_yaml(parser.parse_args().config)
     graph = Hetionet()
     names, genes = build_index(graph)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with Path(config["texts"]).open(encoding="utf-8") as f:
+    config.entities_dir.mkdir(parents=True, exist_ok=True)
+    with config.texts.open(encoding="utf-8") as f:
         for line in f:
             book = json.loads(line)
-            chunk_file = Path(config["chunks_dir"]) / f"{book['book']}.jsonl"
+            chunk_file = config.chunks_dir / f"{book['book']}.jsonl"
             chunks = [json.loads(row)["text"] for row in chunk_file.open(encoding="utf-8")]
             result = book_entities(book, chunks, graph, names, genes)
-            path = out_dir / f"{book['book']}.json"
+            path = config.entities_dir / f"{book['book']}.json"
             path.write_text(json.dumps(result, indent=1), encoding="utf-8")
             counts = ", ".join(f"{kind}: {len(v)}" for kind, v in result["entities"].items())
             print(f"{book['book']}: {counts}")

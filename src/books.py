@@ -1,17 +1,17 @@
-"""Turn the PDF books of `books_dir` into chunks, one JSONL file per book.
+"""Turn the PDF documents of a corpus (textbooks, guidelines) into chunks, one file per document.
 
-Three steps; mmore runs in its own environment (see configs/postprocess.yaml):
+A corpus config (configs/textbooks.yaml, configs/guidelines.yaml) names the folder of PDFs and the
+folder for every output. Two steps; the second runs mmore, which lives in its own environment
+(see configs/chunker.yaml):
 
-    uv run python src/books.py pages configs/books.yaml   # PDF -> pages, and the full text
-    mmore postprocess --config-file configs/postprocess.yaml \
-        --input-data data/books/processed/pages.jsonl      # pages -> chunks (all books)
-    uv run python src/books.py split configs/books.yaml   # chunks -> one file per book
+    uv run python src/books.py pages configs/textbooks.yaml   # PDF -> pages, and the full text
+    uv run python src/books.py chunk configs/textbooks.yaml   # pages -> chunks, one file per doc
 
-Pages and chunks are mmore `MultimodalSample`s, one per line:
+Pages and chunks are mmore `MultimodalSample`s, one per line ("book" is the document's file name):
 
     {"text": "<markdown>", "modalities": [], "metadata": {"file_path", "book", "page", ...}}
 
-`pages` also writes the reference text of each book, before chunking, one line per book:
+`pages` also writes the reference text of each document, before chunking, one line per document:
 
     {"book", "text": its pages joined by a blank line, "page_numbers", "page_starts"}
 
@@ -21,39 +21,55 @@ Character positions elsewhere (e.g. src/book_entities.py) are offsets in that te
 import argparse
 import json
 import re
+import subprocess
+import tempfile
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pymupdf
 import pymupdf4llm
 import yaml
 
+CHUNKER_CONFIG = Path("configs/chunker.yaml")  # mmore's chunker settings, shared by every corpus
+
 
 @dataclass
-class BooksConfig:
-    books_dir: Path
-    pages: Path  # output of `pages`, input of mmore
-    texts: Path  # output of `pages`: the full text of each book, one line per book
-    chunks: Path  # output of mmore, input of `split`
-    chunks_dir: Path  # output of `split`: one <book>.jsonl per book
-    entities_dir: Path  # output of src/book_entities.py
-    plots_dir: Path  # output of src/plot_entities.py
+class CorpusConfig:
+    name: str
+    pdf_dir: Path  # the PDFs of the corpus
+    processed_dir: Path  # every output, at the fixed paths below
+    titles: dict = field(default_factory=dict)  # file name or number prefix -> title (for plots)
 
     def __post_init__(self) -> None:
-        for name in [
-            "books_dir",
-            "pages",
-            "texts",
-            "chunks",
-            "chunks_dir",
-            "entities_dir",
-            "plots_dir",
-        ]:
-            setattr(self, name, Path(getattr(self, name)))
+        self.pdf_dir, self.processed_dir = Path(self.pdf_dir), Path(self.processed_dir)
+
+    @property
+    def pages(self) -> Path:  # one cleaned page per line, input of mmore
+        return self.processed_dir / "pages.jsonl"
+
+    @property
+    def texts(self) -> Path:  # the reference text of each document, one per line
+        return self.processed_dir / "texts.jsonl"
+
+    @property
+    def chunks(self) -> Path:  # mmore's output, every document
+        return self.processed_dir / "chunks.jsonl"
+
+    @property
+    def chunks_dir(self) -> Path:  # one <document>.jsonl of chunks per document
+        return self.processed_dir / "chunks"
+
+    @property
+    def entities_dir(self) -> Path:  # output of src/book_entities.py
+        return self.processed_dir / "entities"
+
+    @property
+    def plots_dir(self) -> Path:  # output of src/plot_entities.py
+        return self.processed_dir / "plots"
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "BooksConfig":
+    def from_yaml(cls, path: str | Path) -> "CorpusConfig":
         return cls(**yaml.safe_load(Path(path).read_text(encoding="utf-8")))
 
 
@@ -147,13 +163,13 @@ def strip_references(texts: list[str], toc_titles: set[str]) -> tuple[list[str],
     return ["\n".join(page) for page in kept], removed
 
 
-def write_pages(config: BooksConfig) -> None:
+def write_pages(config: CorpusConfig) -> None:
     config.pages.parent.mkdir(parents=True, exist_ok=True)
     with (
         config.pages.open("w", encoding="utf-8") as out,
         config.texts.open("w", encoding="utf-8") as texts_out,
     ):
-        for pdf in sorted(config.books_dir.glob("*.pdf")):
+        for pdf in sorted(config.pdf_dir.glob("*.pdf")):
             pages = pymupdf4llm.to_markdown(str(pdf), page_chunks=True, show_progress=False)
             texts = strip_running_lines([page["text"] for page in pages])
             toc_titles = {
@@ -190,10 +206,20 @@ def write_pages(config: BooksConfig) -> None:
             )
 
 
-def split_chunks(config: BooksConfig) -> None:
+def chunk(config: CorpusConfig) -> None:
+    """Chunk the pages with mmore (settings in CHUNKER_CONFIG), then write one file per document."""
+    settings = yaml.safe_load(CHUNKER_CONFIG.read_text(encoding="utf-8"))
+    settings["output"] = {"output_path": str(config.chunks), "save_each_step": False}
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+        yaml.safe_dump(settings, f)
+    config.chunks.unlink(missing_ok=True)  # mmore appends to an existing file
+    command = ["mmore", "postprocess", "--config-file", f.name, "--input-data", str(config.pages)]
+    subprocess.run(command, check=True)
+    Path(f.name).unlink()
+
     by_book = defaultdict(list)
-    with config.chunks.open(encoding="utf-8") as f:
-        for line in f:
+    with config.chunks.open(encoding="utf-8") as chunks:
+        for line in chunks:
             by_book[json.loads(line)["metadata"]["book"]].append(line)
     config.chunks_dir.mkdir(parents=True, exist_ok=True)
     for book, lines in sorted(by_book.items()):
@@ -203,8 +229,8 @@ def split_chunks(config: BooksConfig) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("step", choices=["pages", "split"])
-    parser.add_argument("config", help="YAML config, e.g. configs/books.yaml")
+    parser.add_argument("step", choices=["pages", "chunk"])
+    parser.add_argument("config", help="corpus config, e.g. configs/textbooks.yaml")
     args = parser.parse_args()
-    config = BooksConfig.from_yaml(args.config)
-    write_pages(config) if args.step == "pages" else split_chunks(config)
+    config = CorpusConfig.from_yaml(args.config)
+    write_pages(config) if args.step == "pages" else chunk(config)

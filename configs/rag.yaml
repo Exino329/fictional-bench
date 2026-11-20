@@ -4,9 +4,9 @@
 #   .venv-rag/bin/python src/rag_run.py configs/rag.yaml           # every method below
 #   .venv-rag/bin/python src/rag_eval.py configs/rag.yaml          # answer accuracy and recall
 
-# Corpus: the chunks of these books (src/books.py split), one document per chunk.
-books: [1-pdq-colorectal-major-genetic-syndromes]
-chunks_dir: data/books/processed/chunks
+# Corpus: the chunks of these documents (src/books.py chunk), one RAG document per chunk.
+books: [1-genetics-colorectal]  # full textbook; gold docs are found again from the evidence
+chunks_dir: data/corpora/textbooks/processed/chunks
 corpus: data/rag/corpus/pdq.jsonl
 index_dir: data/rag/indexes/pdq
 

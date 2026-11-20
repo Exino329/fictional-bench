@@ -1,0 +1,9 @@
+# Clinical guidelines used as host documents (PDFs kept local, never committed).
+# Same steps as configs/textbooks.yaml, with this config.
+
+name: guidelines
+pdf_dir: data/corpora/guidelines/pdf
+processed_dir: data/corpora/guidelines/processed
+
+# Titles for the plots, by file name or number prefix; files without one show their file name.
+titles: {}

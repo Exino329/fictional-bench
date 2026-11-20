@@ -7,7 +7,7 @@
   against its position in the book (columns: equal slices of the text), coloured by the number
   of mentions in each slice; the total is written at the end of each row.
 
-    uv run python src/plot_entities.py configs/books.yaml
+    uv run python src/plot_entities.py configs/textbooks.yaml
 """
 
 import argparse
@@ -19,27 +19,17 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-import yaml  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, LogNorm  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
+
+from books import CorpusConfig  # noqa: E402
 
 MIN_MENTIONS = 10  # entities shown in the per-book heatmaps…
 MAX_PER_KIND = 15  # …at most this many per category, the most mentioned
 SLICES = 40  # slices of the book text (2.5% each)
 
 # Book titles for the plots, by file-name prefix.
-TITLES = {
-    "1": "Genetics of Colorectal Cancer",
-    "2": "Medical Genetics Summaries",
-    "3": "The EBMT Handbook, 8th ed.",
-    "4": "Microbiology, Pharmacology, and Immunology for Pre-Clinical Students",
-    "5": "Nursing: Mental Health and Community Concepts",
-    "6": "The EBMT/EHA CAR-T Cell Handbook",
-    "7": "Diseases of the Chest, Breast, Heart and Vessels 2019–2022",
-    "8": "Diseases of the Abdomen and Pelvis 2023–2026",
-    "9": "Diseases of the Brain, Head and Neck, Spine 2024–2027",
-    "10": "The EBMT Textbook for Nurses, 2nd ed.",
-}
+TITLES: dict[str, str] = {}  # file name or number prefix -> title, from the corpus config
 KINDS = [
     "Gene",
     "Compound",
@@ -80,7 +70,16 @@ plt.rcParams.update(
 
 def title(book: str) -> str:
     prefix = book.split("-", 1)[0]
-    return f"{prefix}. {TITLES.get(prefix, book)}"
+    name = TITLES.get(book) or TITLES.get(prefix)
+    if name is None:
+        return book
+    return f"{prefix}. {name}" if prefix.isdigit() else name
+
+
+def order(path: Path) -> tuple:
+    """Numbered files first, by number ("10-…" after "9-…"), then the others by name."""
+    prefix = path.stem.split("-", 1)[0]
+    return (0, int(prefix), "") if prefix.isdigit() else (1, 0, path.stem)
 
 
 def colorbar(fig, image, label: str, ax=None, cax=None) -> None:
@@ -260,13 +259,13 @@ def book_heatmap(result: dict, out: Path) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("config", help="YAML config, e.g. configs/books.yaml")
-    config = yaml.safe_load(Path(parser.parse_args().config).read_text(encoding="utf-8"))
-    entities_dir, out_dir = Path(config["entities_dir"]), Path(config["plots_dir"])
-    out_dir.mkdir(parents=True, exist_ok=True)
-    paths = sorted(entities_dir.glob("*.json"), key=lambda p: int(p.stem.split("-", 1)[0]))
+    parser.add_argument("config", help="corpus config, e.g. configs/textbooks.yaml")
+    config = CorpusConfig.from_yaml(parser.parse_args().config)
+    TITLES.update({str(key): value for key, value in config.titles.items()})
+    config.plots_dir.mkdir(parents=True, exist_ok=True)
+    paths = sorted(config.entities_dir.glob("*.json"), key=order)
     results = [json.loads(p.read_text()) for p in paths]
-    overview(results, out_dir / "overview.png")
+    overview(results, config.plots_dir / "overview.png")
     for result in results:
-        book_heatmap(result, out_dir / f"{result['book']}.png")
-    print(f"wrote {len(results) + 1} plots to {out_dir}")
+        book_heatmap(result, config.plots_dir / f"{result['book']}.png")
+    print(f"wrote {len(results) + 1} plots to {config.plots_dir}")

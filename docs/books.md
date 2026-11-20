@@ -1,25 +1,33 @@
 # Candidate host books
 
-Five open-licence medical book parts, stored locally (never committed). Files are prefixed with
-the book number.
+Medical textbooks used as host documents, stored locally (never committed). A second corpus, of
+clinical guidelines, uses the same layout and steps with `configs/guidelines.yaml`.
 
-- full books: `data/books/full/`
-- parts to use: `data/books/parts/`
-- processed outputs in `data/books/processed/`:
-  - `pages.jsonl`: one cleaned page per line (input of mmore)
-  - `books.jsonl`: the reference text of each book before chunking, one book per line;
-    character positions elsewhere are offsets in this text
-  - `chunks/`: the chunks of each book (mmore sentence chunker, 256 tokens)
-  - `entities/`: the Hetionet entities of each book, with the position, page and gap of
-    every mention
-  - `plots/`: heatmaps of these entities
+```
+data/corpora/<corpus>/
+├── pdf/           the documents, prefixed with their number
+├── parts/         textbooks only: the parts first chosen below
+└── processed/
+    ├── pages.jsonl    one cleaned page per line (input of mmore), references removed
+    ├── texts.jsonl    the reference text of each document before chunking; character
+    │                  positions elsewhere are offsets in this text
+    ├── chunks/        the chunks of each document (mmore sentence chunker, 256 tokens)
+    ├── entities/      the Hetionet entities of each document, with the position, page and
+    │                  gap of every mention
+    └── plots/         heatmaps of these entities
+```
 
-To rebuild everything, run the three steps in `src/books.py`, then:
+To rebuild a corpus:
 
-    uv run python src/book_entities.py configs/books.yaml
-    uv run python src/plot_entities.py configs/books.yaml
+    uv run python src/books.py pages configs/textbooks.yaml
+    uv run python src/books.py chunk configs/textbooks.yaml
+    uv run python src/book_entities.py configs/textbooks.yaml
+    uv run python src/plot_entities.py configs/textbooks.yaml
 
-| # | Book | Part to use | File in `data/books/parts/` |
+The sections below describe the parts first chosen in each textbook; the pipeline now runs on
+the full textbooks (`pdf/`).
+
+| # | Book | Part to use | File in `data/corpora/textbooks/parts/` |
 |---|---|---|---|
 | 1 | [Genetics of Colorectal Cancer (PDQ®), Health Professional Version](https://www.cancer.gov/types/colorectal/hp/colorectal-genetics-pdq) (NCI, version of 21 Mar 2025) | "Major Genetic Syndromes" section (printed pages 28–184) | `1-pdq-colorectal-major-genetic-syndromes.pdf` |
 | 2 | [Medical Genetics Summaries](https://www.ncbi.nlm.nih.gov/books/NBK61999/) (NCBI) | CYP2D6 overview + thioridazine, valbenazine, metoprolol, atomoxetine | `2-medical-genetics-cyp2d6.pdf` |

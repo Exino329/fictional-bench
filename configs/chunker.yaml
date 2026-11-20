@@ -1,8 +1,7 @@
-# mmore postprocess: chunk the book pages written by `src/books.py pages`.
-# mmore runs in its own environment (its transformers pin clashes with our huggingface-hub):
+# mmore's chunker settings, shared by every corpus. `src/books.py chunk <corpus config>` runs
+# mmore with these settings and the corpus' own output path. mmore runs in its own environment
+# (its transformers pin clashes with our huggingface-hub):
 #   uv tool install "mmore[process]" --python 3.12 --torch-backend cpu --with tiktoken --with nltk
-#   mmore postprocess --config-file configs/postprocess.yaml \
-#       --input-data data/books/processed/pages.jsonl
 
 pp_modules:
   - type: chunker
@@ -12,7 +11,3 @@ pp_modules:
         chunk_size: 256  # max tokens per chunk (GPT-2 tokenizer, approximate count)
         chunk_overlap: 0  # tokens shared between consecutive chunks
       table_handling: single_row
-
-output:
-  output_path: data/books/processed/chunks.jsonl
-  save_each_step: False
