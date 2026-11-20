@@ -5,5 +5,16 @@ name: guidelines
 pdf_dir: data/corpora/guidelines/pdf
 processed_dir: data/corpora/guidelines/processed
 
-# Titles for the plots, by file name or number prefix; files without one show their file name.
-titles: {}
+# Titles for the plots, by the number that prefixes each file name.
+titles:
+  "1": NZ Acute Rheumatic Fever and Rheumatic Heart Disease 2024
+  "2": Brazilian Guideline for Heart Failure 2026
+  "3": NZ Opioid Substitution Treatment 2025
+  "4": Brazilian Guideline on Dyslipidemias 2025
+  "5": VA/DoD Guideline for Bipolar Disorder 2023
+  "6": "TIP 45: Detoxification and Substance Abuse Treatment"
+  "7": HIV Opportunistic Infections in Adults and Adolescents
+  "8": HRSA Guide for HIV/AIDS Clinical Care 2014
+  "9": "Drug Misuse and Dependence: UK Guidelines"
+  "10": NZ Immunisation Handbook 2020
+  "11": NZ Tuberculosis Control Guidelines 2019

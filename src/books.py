@@ -103,6 +103,7 @@ REF_HEADING = re.compile(
     r"(?i)^((text|image|chapter) )?(references?|bibliography|further reading|works cited"
     r"|suggested (further )?readings?|recommended readings?|key references|license|licence)$"
 )
+SECTION_NUMBER = re.compile(r"^\s*[A-Z]?\d+(\.\d+)*\.?\s+")  # "3.9 References", "A3.3 …"
 REFERENCE_LINE = re.compile(r"^\s*(-|\d{1,4}\.|\[\d+\])\s")  # "- Smith J…", "12. Smith J…"
 CITATION = re.compile(r"(et al|\b(19|20)\d{2}\b|doi|https?://|\bvol\b|\d+\s*\(\d+\)\s*:)", re.I)
 ATTRIBUTION = re.compile(r"(?i)(licensed under|derivative of|access for free at|cc by)")
@@ -148,9 +149,8 @@ def strip_references(texts: list[str], toc_titles: set[str]) -> tuple[list[str],
     for k, (page, line) in enumerate(lines):
         heading = _heading(line, toc_titles)
         bold = re.fullmatch(r"\s*\*\*([^*]+)\*\*\s*", line)  # "**References**" (no "#")
-        if (heading is not None and REF_HEADING.match(heading)) or (
-            bold and REF_HEADING.match(bold.group(1).strip())
-        ):
+        label = heading if heading is not None else (bold.group(1) if bold else None)
+        if label is not None and REF_HEADING.match(SECTION_NUMBER.sub("", label).strip()):
             in_refs = True
         elif heading is not None and in_refs:
             following = [text for _, text in lines[k + 1 : k + 8]]
