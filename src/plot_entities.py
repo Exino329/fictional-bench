@@ -30,7 +30,7 @@ SLICES = 40  # slices of the book text (2.5% each)
 # Book titles for the plots, by file-name prefix.
 TITLES = {
     "1": "Genetics of Colorectal Cancer",
-    "2": "Medical Genetics Summaries: CYP2D6 group",
+    "2": "Medical Genetics Summaries",
     "3": "The EBMT Handbook, 8th ed.",
     "4": "Microbiology, Pharmacology, and Immunology for Pre-Clinical Students",
     "5": "Nursing: Mental Health and Community Concepts",
