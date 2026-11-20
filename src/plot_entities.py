@@ -2,7 +2,8 @@
 
 - `overview.png`: books x Hetionet categories, coloured by mentions, with the number of
   distinct entities and of mentions in each cell.
-- `<book>.png`: every entity with at least MIN_MENTIONS mentions, grouped by category (rows),
+- `<book>.png`: the entities with at least MIN_MENTIONS mentions (at most MAX_PER_KIND per
+  category), grouped by category (rows),
   against its position in the book (columns: equal slices of the text), coloured by the number
   of mentions in each slice; the total is written at the end of each row.
 
@@ -22,16 +23,22 @@ import yaml  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, LogNorm  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
 
-MIN_MENTIONS = 10  # entities shown in the per-book heatmaps
+MIN_MENTIONS = 10  # entities shown in the per-book heatmaps…
+MAX_PER_KIND = 15  # …at most this many per category, the most mentioned
 SLICES = 40  # slices of the book text (2.5% each)
 
 # Book titles for the plots, by file-name prefix.
 TITLES = {
-    "1": "Genetics of Colorectal Cancer: Major Genetic Syndromes",
+    "1": "Genetics of Colorectal Cancer",
     "2": "Medical Genetics Summaries: CYP2D6 group",
-    "3": "EBMT Handbook: Part V, chapters 35–47",
-    "4": "Microbiology, Pharmacology, and Immunology: chapters 5–6",
-    "5": "Nursing: Mental Health and Community Concepts: chapters 7–9",
+    "3": "The EBMT Handbook, 8th ed.",
+    "4": "Microbiology, Pharmacology, and Immunology for Pre-Clinical Students",
+    "5": "Nursing: Mental Health and Community Concepts",
+    "6": "The EBMT/EHA CAR-T Cell Handbook",
+    "7": "Diseases of the Chest, Breast, Heart and Vessels 2019–2022",
+    "8": "Diseases of the Abdomen and Pelvis 2023–2026",
+    "9": "Diseases of the Brain, Head and Neck, Spine 2024–2027",
+    "10": "The EBMT Textbook for Nurses, 2nd ed.",
 }
 KINDS = [
     "Gene",
@@ -157,6 +164,7 @@ def book_heatmap(result: dict, out: Path) -> None:
     rows, names, totals, groups = [], [], [], []  # groups: (kind, first row, last row)
     for kind in KINDS:
         entities = [e for e in result["entities"].get(kind, []) if e["mentions"] >= MIN_MENTIONS]
+        entities = entities[:MAX_PER_KIND]  # already sorted by mentions
         if not entities:
             continue
         if rows:  # blank row between categories
@@ -225,7 +233,8 @@ def book_heatmap(result: dict, out: Path) -> None:
     bar_ax.text(0.04, -1.2, "total", va="bottom", ha="left", fontsize=8, color=MUTED)
 
     subtitle = (
-        f"Hetionet entities mentioned at least {MIN_MENTIONS} times · colour: mentions per "
+        f"Hetionet entities mentioned at least {MIN_MENTIONS} times (top {MAX_PER_KIND} per "
+        f"category) · colour: mentions per "
         f"{100 / SLICES:g}% of the text"
     )
     for text, offset, style in [
@@ -255,7 +264,8 @@ if __name__ == "__main__":
     config = yaml.safe_load(Path(parser.parse_args().config).read_text(encoding="utf-8"))
     entities_dir, out_dir = Path(config["entities_dir"]), Path(config["plots_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
-    results = [json.loads(p.read_text()) for p in sorted(entities_dir.glob("*.json"))]
+    paths = sorted(entities_dir.glob("*.json"), key=lambda p: int(p.stem.split("-", 1)[0]))
+    results = [json.loads(p.read_text()) for p in paths]
     overview(results, out_dir / "overview.png")
     for result in results:
         book_heatmap(result, out_dir / f"{result['book']}.png")
