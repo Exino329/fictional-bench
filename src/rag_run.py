@@ -28,6 +28,7 @@ from flashrag.dataset import Dataset
 from flashrag.pipeline import IRCOTPipeline
 from flashrag.prompt import PromptTemplate
 from flashrag.utils import get_generator, get_retriever
+from huggingface_hub import snapshot_download
 
 ANSWER_RULE = "Give only the answer, in a few words, with no explanation."
 USER_PROMPT = "Question: {question}\nAnswer:"
@@ -50,6 +51,10 @@ def flashrag_config(config: dict, generator: str, retriever: str | None = None) 
         "seed": 0,
         **{k: v for k, v in config["generators"][generator].items() if k != "vllm_args"},
     }
+    # FlashRAG reads config.json from generator_model_path: a Hugging Face model id is first
+    # downloaded to the Hugging Face cache.
+    if not Path(settings["generator_model_path"]).is_dir():
+        settings["generator_model_path"] = snapshot_download(settings["generator_model_path"])
     if retriever is not None:
         settings.update(config["retrievers"][retriever])
     return Config(config_dict=settings)
