@@ -5,17 +5,20 @@ Methods (the reader is the same everywhere):
 - oracle: the gold documents of every hop.
 - sequential: retrieve once with the question, give the top `retrieval_topk` documents.
 - ircot: FlashRAG's IRCoT: one reasoning step, one retrieval with that step, and so on.
-sequential and ircot run once per retriever. Each output line:
+sequential and ircot run once per retriever. The reader is one of the config's `generators`,
+chosen with --generator; its runs go to runs_dir/<generator>/. Each output line:
 
     {"id", "question", "golden_answers", "gold_docs", "pred", "retrieved": [doc ids, best first],
      "prompt", "steps"}
 
 FlashRAG's own evaluation is skipped: src/rag_eval.py scores the runs.
 
-    .venv-rag/bin/python src/rag_run.py configs/rag.yaml [--methods ircot] [--retrievers bm25]
+    .venv-rag/bin/python src/rag_run.py configs/rag.yaml --generator apertus-fp8 \
+        [--methods ircot] [--retrievers bm25]
 """
 
 import argparse
+import functools
 import json
 from pathlib import Path
 
@@ -32,20 +35,20 @@ CLOSED_BOOK_SYSTEM = f"Answer the question. {ANSWER_RULE}"
 WITH_DOCS_SYSTEM = f"Answer the question using the documents below. {ANSWER_RULE}\n\n{{reference}}"
 
 
-def flashrag_config(config: dict, retriever: str | None = None) -> Config:
+def flashrag_config(config: dict, generator: str, retriever: str | None = None) -> Config:
     dataset_dir = Path(config["dataset_dir"])
     settings = {
         "data_dir": str(dataset_dir.parent),
         "dataset_name": dataset_dir.name,
         "split": ["test"],
-        "save_dir": str(Path(config["runs_dir"]) / "flashrag"),
+        "save_dir": str(Path(config["runs_dir"]) / generator / "flashrag"),
         "corpus_path": config["corpus"],
         "retrieval_topk": config["retrieval_topk"],
         "retrieval_batch_size": 32,
         "silent_retrieval": True,
         "gpu_id": "0",
         "seed": 0,
-        **config["generator"],
+        **{k: v for k, v in config["generators"][generator].items() if k != "vllm_args"},
     }
     if retriever is not None:
         settings.update(config["retrievers"][retriever])
@@ -86,6 +89,12 @@ def template(cfg: Config, system: str, user: str = USER_PROMPT, reference=None) 
     )
     # FlashRAG applies the model's chat template only to models named "chat" or "instruct".
     prompt.is_chat = True
+    # Answer directly: no "thinking" block (Qwen3), which would eat the token budget. Chat
+    # templates without this option ignore it.
+    tokenizer = prompt._get_tokenizer()
+    tokenizer.apply_chat_template = functools.partial(
+        tokenizer.apply_chat_template, enable_thinking=False
+    )
     return prompt
 
 
@@ -175,14 +184,21 @@ if __name__ == "__main__":
     parser.add_argument("config", help="YAML config, e.g. configs/rag.yaml")
     parser.add_argument("--methods", nargs="*", help="subset of the config's methods")
     parser.add_argument("--retrievers", nargs="*", help="subset of the config's retrievers")
+    parser.add_argument("--generator", help="one of the config's generators (default: the first)")
     args = parser.parse_args()
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
+    reader = args.generator or next(iter(config["generators"]))
     methods = args.methods or config["methods"]
     retrievers = args.retrievers or list(config["retrievers"])
-    runs_dir = Path(config["runs_dir"])
+    runs_dir = Path(config["runs_dir"]) / reader
     test_path = str(Path(config["dataset_dir"]) / "test.jsonl")
 
-    base = flashrag_config(config)
+    vllm_args = config["generators"][reader].get("vllm_args")
+    if vllm_args:  # FlashRAG builds vllm.LLM itself and exposes none of these arguments
+        import vllm
+
+        vllm.LLM = functools.partial(vllm.LLM, **vllm_args)
+    base = flashrag_config(config, reader)
     generator = get_generator(base)  # loaded once, shared by every run
     corpus = {}
     with open(config["corpus"], encoding="utf-8") as f:
@@ -197,7 +213,7 @@ if __name__ == "__main__":
     for name in retrievers:
         if not {"sequential", "ircot"} & set(methods):
             break
-        cfg = flashrag_config(config, name)
+        cfg = flashrag_config(config, reader, name)
         retriever = SafeRetriever(get_retriever(cfg))
         if "sequential" in methods:
             dataset = sequential(

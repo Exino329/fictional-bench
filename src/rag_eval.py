@@ -6,6 +6,8 @@ Per run:
 - chain@k: share of questions whose every hop is found in the first k.
 - shortcut: share of questions answered correctly although the reader did not get the full chain.
 For ircot, retrieval counts every document seen over the steps (column "all").
+Runs are read from runs_dir/<reader>/ (one folder per reader of src/rag_run.py), and the
+summary covers every reader.
 FlashRAG's own retrieval_recall only checks that the answer string appears in a passage.
 
     .venv-rag/bin/python src/rag_eval.py configs/rag.yaml
@@ -64,19 +66,20 @@ if __name__ == "__main__":
     columns += ["shortcut", "docs_seen"]
     lines = ["| run | " + " | ".join(columns) + " |", "|---|" + "---|" * len(columns)]
     summary = {}
-    for path in sorted(runs_dir.glob("*.jsonl")):
+    for path in sorted(runs_dir.glob("*/*.jsonl")):
         rows = [json.loads(line) for line in path.open(encoding="utf-8")]
         # the reader sees retrieval_topk documents in sequential, every document seen in ircot
         reader_k = config["retrieval_topk"] if path.stem.startswith("sequential") else None
         result = score(rows, ks, reader_k)
-        summary[path.stem] = result
+        run = f"{path.parent.name}/{path.stem}"
+        summary[run] = result
         cells = [
             ""
             if c not in result
             else (f"{result[c]:.2f}" if isinstance(result[c], float) else str(result[c]))
             for c in columns
         ]
-        lines.append(f"| {path.stem} | " + " | ".join(cells) + " |")
+        lines.append(f"| {run} | " + " | ".join(cells) + " |")
     table = "\n".join(lines)
     print(table)
     (runs_dir / "summary.md").write_text(table + "\n", encoding="utf-8")

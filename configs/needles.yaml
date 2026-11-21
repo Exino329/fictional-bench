@@ -1,0 +1,79 @@
+# Needle test: 100 fictional 2-hop questions (hardcoded, configs/needles/questions_2hop.jsonl),
+# their 2 needle sentences inserted into two different chunks of the textbooks corpus,
+# answered by every RAG method of src/rag_run.py with three readers (on the cluster: scripts/rcp/).
+#   uv run python src/needles.py configs/needles.yaml               # insert the needles
+#   .venv-rag/bin/python src/rag_data.py configs/needles.yaml       # FlashRAG corpus + dataset
+#   bash scripts/build_rag_indexes.sh configs/needles.yaml          # BM25 and BGE-M3 indexes
+#   .venv-rag/bin/python src/rag_run.py configs/needles.yaml --generator qwen
+#   .venv-rag/bin/python src/rag_eval.py configs/needles.yaml       # every reader, one table
+
+# src/needles.py
+needles: configs/needles/questions_2hop.jsonl
+seed: 0  # where each needle goes inside its chunk
+source_chunks_dir: data/corpora/textbooks/processed/chunks
+out_dir: data/rag/needles
+
+# Corpus: every textbook, needles included, one RAG document per chunk (src/rag_data.py).
+books:
+  - 1-genetics-colorectal
+  - 2-medical-genetics-summaries
+  - 3-ebmt-handbook
+  - 4-microbiology-pharmacology
+  - 5-nursing-mental-health
+  - 6-car-t-cell-handbook
+  - 7-diseases-chest-breast-heart-vessels
+  - 8-diseases-abdomen-pelvis
+  - 9-diseases-brain-head-neck-spine
+  - 10-transplant-nurse
+chunks_dir: data/rag/needles/chunks
+corpus: data/rag/needles/corpus.jsonl
+index_dir: data/rag/needles/indexes
+questions: data/rag/needles/questions.jsonl
+dataset_dir: data/rag/needles/dataset
+runs_dir: data/rag/needles/runs
+
+methods: [closed_book, oracle, sequential, ircot]  # sequential and ircot run with each retriever
+retrievers:
+  bm25:
+    retrieval_method: bm25
+    bm25_backend: bm25s
+    index_path: data/rag/needles/indexes/bm25
+  bge-m3:
+    retrieval_method: bge-m3
+    retrieval_model_path: BAAI/bge-m3
+    retrieval_pooling_method: cls
+    retrieval_query_max_length: 512
+    use_sentence_transformer: true
+    instruction: ""  # BGE-M3 takes no query prefix; FlashRAG adds the BGE v1.5 one by default
+    index_path: data/rag/needles/indexes/bge-m3_Flat.index
+
+retrieval_topk: 5  # documents given to the reader
+recall_k: [1, 5, 10, 20]  # sequential keeps max(recall_k) documents to measure recall@k
+ircot_max_iter: 3
+
+# Readers in bf16 (cluster GPU), chosen with `rag_run.py --generator <name>`.
+# vllm_args: extra arguments of vllm.LLM, which FlashRAG does not expose.
+generators:
+  apertus:
+    framework: vllm
+    generator_model: apertus-8b-meditron
+    generator_model_path: EPFLiGHT/Apertus-8B-MeditronFO
+    generator_max_input_len: 8192
+    gpu_memory_utilization: 0.75  # the rest for BGE-M3 query encoding
+    generation_params: {max_tokens: 64, temperature: 0}
+  qwen:
+    framework: vllm
+    generator_model: qwen3.5-9b
+    generator_model_path: Qwen/Qwen3.5-9B
+    generator_max_input_len: 8192
+    gpu_memory_utilization: 0.75
+    generation_params: {max_tokens: 64, temperature: 0}
+    vllm_args: {language_model_only: true}  # multimodal: skip the vision encoder
+  gemma:
+    framework: vllm
+    generator_model: gemma-3-12b-it
+    generator_model_path: google/gemma-3-12b-it  # gated: accept the licence on Hugging Face
+    generator_max_input_len: 8192
+    gpu_memory_utilization: 0.75
+    generation_params: {max_tokens: 64, temperature: 0}
+    vllm_args: {language_model_only: true}

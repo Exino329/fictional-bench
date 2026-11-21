@@ -34,11 +34,13 @@ retrieval_topk: 5  # documents given to the reader
 recall_k: [1, 5, 10, 20]  # sequential keeps max(recall_k) documents to measure recall@k
 ircot_max_iter: 3
 
-# Reader: Apertus in FP8 (src/quantize_fp8.py), so it fits the 16 GB laptop GPU.
-generator:
-  framework: vllm
-  generator_model: apertus-8b-meditron
-  generator_model_path: data/models/Apertus-8B-MeditronFO-FP8-Dynamic
-  generator_max_input_len: 8192
-  gpu_memory_utilization: 0.8
-  generation_params: {max_tokens: 64, temperature: 0}
+# Readers, chosen with `rag_run.py --generator <name>`; each writes to runs_dir/<name>/.
+generators:
+  # Apertus in FP8 (src/quantize_fp8.py), so it fits the 16 GB laptop GPU.
+  apertus-fp8:
+    framework: vllm
+    generator_model: apertus-8b-meditron
+    generator_model_path: data/models/Apertus-8B-MeditronFO-FP8-Dynamic
+    generator_max_input_len: 8192
+    gpu_memory_utilization: 0.8
+    generation_params: {max_tokens: 64, temperature: 0}
