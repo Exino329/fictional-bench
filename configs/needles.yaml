@@ -71,9 +71,9 @@ generators:
     vllm_args: {language_model_only: true}  # multimodal: skip the vision encoder
   gemma:
     framework: vllm
-    generator_model: gemma-3-12b-it
-    generator_model_path: unsloth/gemma-3-12b-it  # same weights as google/gemma-3-12b-it, not gated
+    generator_model: gemma-3-27b-meditron
+    generator_model_path: EPFLiGHT/Gemma-3-27B-MeditronFO  # Gemma-3-27B-it fine-tuned on medical data
     generator_max_input_len: 8192
-    gpu_memory_utilization: 0.75
+    gpu_memory_utilization: 0.85  # ~54 GB of bf16 weights on an 80 GB H100, BGE-M3 in the rest
     generation_params: {max_tokens: 64, temperature: 0}
     vllm_args: {language_model_only: true}
