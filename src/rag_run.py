@@ -25,6 +25,7 @@ from pathlib import Path
 import yaml
 from flashrag.config import Config
 from flashrag.dataset import Dataset
+from flashrag.generator import VLLMGenerator
 from flashrag.pipeline import IRCOTPipeline
 from flashrag.prompt import PromptTemplate
 from flashrag.utils import get_generator, get_retriever
@@ -204,7 +205,9 @@ if __name__ == "__main__":
 
         vllm.LLM = functools.partial(vllm.LLM, **vllm_args)
     base = flashrag_config(config, reader)
-    generator = get_generator(base)  # loaded once, shared by every run
+    # loaded once, shared by every run. get_generator would send any model whose config has a
+    # vision part (Qwen3.5, Gemma 3) to FlashRAG's Hugging Face Qwen2-VL generator, not to vLLM.
+    generator = VLLMGenerator(base) if base["framework"] == "vllm" else get_generator(base)
     corpus = {}
     with open(config["corpus"], encoding="utf-8") as f:
         for line in f:
