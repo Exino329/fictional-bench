@@ -72,7 +72,7 @@ generators:
   gemma:
     framework: vllm
     generator_model: gemma-3-12b-it
-    generator_model_path: google/gemma-3-12b-it  # gated: accept the licence on Hugging Face
+    generator_model_path: unsloth/gemma-3-12b-it  # same weights as google/gemma-3-12b-it, not gated
     generator_max_input_len: 8192
     gpu_memory_utilization: 0.75
     generation_params: {max_tokens: 64, temperature: 0}
